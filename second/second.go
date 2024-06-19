@@ -9,7 +9,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func main2() {
+func example() {
 	rl := ratelimit.New(10) // per second
 
 	time.Sleep(time.Second / 2.0)
@@ -23,7 +23,7 @@ func main2() {
 }
 
 // 範例程式碼：https://www.jianshu.com/p/1ecb513f7632
-func main() {
+func example2() {
 	counter := 0
 	ctx := context.Background()
 
