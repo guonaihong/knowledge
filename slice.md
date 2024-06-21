@@ -3,7 +3,7 @@
 
 * 如果新的len大于2倍的cap，直接用len当作cap的长度
 * 如果小于256，直接返回2倍的oldcap
-* 1/4 *newcap + 3/4* 256, newcap超大，slice就越接近1.25的系统增加容易, 想象一下y=ax+b的线条，3/4 * 256 的作用把整根线条往上提了提
+* 1/4 *newcap + 3/4* 256。 随着newcap越大，slice就越接近1.25的系统增加容量, 想象一下y=ax+b的线条，3/4 * 256 的作用把整根线条往上提了提
 
 ```go
 func nextslicecap(newLen, oldCap int) int {
