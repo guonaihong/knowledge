@@ -1,3 +1,91 @@
+### 一、context 保存值和取值
+
+#### 1.1 使用例子
+
+```go
+type favContextKey string
+
+ f := func(ctx context.Context, k favContextKey) {
+  if v := ctx.Value(k); v != nil {
+   fmt.Println("found value:", v)
+   return
+  }
+  fmt.Println("key not found:", k)
+ }
+
+ k := favContextKey("language")
+ ctx := context.WithValue(context.Background(), k, "Go")
+
+ f(ctx, k)
+ f(ctx, favContextKey("color"))
+```
+
+### 1.2 保存值的实现
+
+```go
+func WithValue(parent Context, key, val any) Context {
+ if parent == nil {
+  panic("cannot create context from nil parent")
+ }
+ if key == nil {
+  panic("nil key")
+ }
+ if !reflectlite.TypeOf(key).Comparable() {
+  panic("key is not comparable")
+ }
+ return &valueCtx{parent, key, val}
+}
+```
+
+### 1.3 查找的代码实现
+
+* 使用的
+
+```go
+```k
+
+```go
+func value(c Context, key any) any {
+ for {
+  switch ctx := c.(type) {
+  case *valueCtx:
+   if key == ctx.key {
+    return ctx.val
+   }
+   c = ctx.Context
+  case *cancelCtx:
+   if key == &cancelCtxKey {
+    return c
+   }
+   c = ctx.Context
+  case withoutCancelCtx:
+   if key == &cancelCtxKey {
+    // This implements Cause(ctx) == nil
+    // when ctx is created using WithoutCancel.
+    return nil
+   }
+   c = ctx.c
+  case *timerCtx:
+   if key == &cancelCtxKey {
+    return &ctx.cancelCtx
+   }
+   c = ctx.Context
+  case backgroundCtx, todoCtx:
+   return nil
+  default:
+   return c.Value(key)
+  }
+ }
+}
+
+```
+
+#### 1.4 总结
+
+* context 通过包装上层的context，像链表一样，可以将上层的context传递给下层的context。本质上下层context包含了上层的context
+* context.WithValue保存值
+* ctx.Value 搜索值
+
 ### 注释代码版本
 
 ```go
