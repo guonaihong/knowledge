@@ -20,7 +20,9 @@ type favContextKey string
  f(ctx, favContextKey("color"))
 ```
 
-### 1.2 保存值的实现
+#### 1.2 保存值的实现
+
+WithValue, 直接通过valueCtx，保存本层key/value +上层context
 
 ```go
 func WithValue(parent Context, key, val any) Context {
@@ -37,12 +39,9 @@ func WithValue(parent Context, key, val any) Context {
 }
 ```
 
-### 1.3 查找的代码实现
+#### 1.3 查找的代码实现
 
-* 使用的
-
-```go
-```k
+value是通过一个for循环，从本层的context断言出具体类型，然后不停.Context取出上层context，直接找到值，或者全部遍历完。如果是第三方实现就直接调用`.Value(key)`
 
 ```go
 func value(c Context, key any) any {
@@ -84,7 +83,168 @@ func value(c Context, key any) any {
 
 * context 通过包装上层的context，像链表一样，可以将上层的context传递给下层的context。本质上下层context包含了上层的context
 * context.WithValue保存值
-* ctx.Value 搜索值
+* ctx.Value 搜索值, 只找它的父兄弟，不会遍历兄弟节点(注意)
+
+### 二、 context cancel和Done
+
+#### 2.1 例子
+
+```go
+gen := func(ctx context.Context) <-chan int {
+  dst := make(chan int)
+  n := 1
+  go func() {
+   for {
+    select {
+    case <-ctx.Done():
+     return // returning not to leak the goroutine
+    case dst <- n:
+     n++
+    }
+   }
+  }()
+  return dst
+ }
+
+ ctx, cancel := context.WithCancel(context.Background())
+ defer cancel() // cancel when we are finished consuming integers
+
+ for n := range gen(ctx) {
+  fmt.Println(n)
+  if n == 5 {
+   break
+  }
+ }
+```
+
+#### 2.2 cancel
+
+* 如果是该ctx被取消了，就把children都取消了
+* 并且从父context中移除自己
+* 一句话描述，close(done), 删子，删自己
+
+```go
+func (c *cancelCtx) cancel(removeFromParent bool, err, cause error) {
+ if err == nil {
+  panic("context: internal error: missing cancel error")
+ }
+ if cause == nil {
+  cause = err
+ }
+ c.mu.Lock()
+ if c.err != nil {
+  c.mu.Unlock()
+  return // already canceled
+ }
+ c.err = err
+ c.cause = cause
+ d, _ := c.done.Load().(chan struct{})
+ if d == nil {
+  c.done.Store(closedchan)
+ } else {
+  close(d)
+ }
+ for child := range c.children {
+  // NOTE: acquiring the child's lock while holding parent's lock.
+  child.cancel(false, err, cause)
+ }
+ c.children = nil
+ c.mu.Unlock()
+
+ if removeFromParent {
+  removeChild(c.Context, c)
+ }
+}
+```
+
+#### 2.3 done
+
+* 如果有就取出done的chan, 没有就初始化一个
+* 如果父context不是标准库派生的，单起一个go程监控父/子context退出的事件
+
+```go
+
+func (c *cancelCtx) Done() <-chan struct{} {
+ d := c.done.Load()
+ if d != nil {
+  return d.(chan struct{})
+ }
+ c.mu.Lock()
+ defer c.mu.Unlock()
+ d = c.done.Load()
+ if d == nil {
+  d = make(chan struct{})
+  c.done.Store(d)
+ }
+ return d.(chan struct{})
+}
+```
+
+#### 2.4 总结
+
+* 如果多个go程调用ctx.Done()，只要cancel()， 都可以即时退立，这是为什么？主要是被了chan的close触发，如果一个chan被close了，那么所有的<-done都会解除阻塞状态
+
+### 三、 propagateCancel 实现
+
+* 检查下父ctx有没有被取消，没有被取消就初始下
+
+```go
+func (c *cancelCtx) propagateCancel(parent Context, child canceler) {
+ c.Context = parent
+
+ done := parent.Done()
+ if done == nil {
+  return // parent is never canceled
+ }
+
+ select {
+ case <-done:
+  // parent is already canceled
+  child.cancel(false, parent.Err(), Cause(parent))
+  return
+ default:
+ }
+
+ if p, ok := parentCancelCtx(parent); ok {
+  // parent is a *cancelCtx, or derives from one.
+  p.mu.Lock()
+  if p.err != nil {
+   // parent has already been canceled
+   child.cancel(false, p.err, p.cause)
+  } else {
+   if p.children == nil {
+    p.children = make(map[canceler]struct{})
+   }
+   p.children[child] = struct{}{}
+  }
+  p.mu.Unlock()
+  return
+ }
+
+ if a, ok := parent.(afterFuncer); ok {
+  // parent implements an AfterFunc method.
+  c.mu.Lock()
+  stop := a.AfterFunc(func() {
+   child.cancel(false, parent.Err(), Cause(parent))
+  })
+  c.Context = stopCtx{
+   Context: parent,
+   stop:    stop,
+  }
+  c.mu.Unlock()
+  return
+ }
+
+ goroutines.Add(1)
+ go func() {
+  select {
+  case <-parent.Done():
+   child.cancel(false, parent.Err(), Cause(parent))
+  case <-child.Done():
+  }
+ }()
+}
+```
 
 ### 注释代码版本
 
