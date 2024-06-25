@@ -1,3 +1,31 @@
+### 分析代码
+
+* 单生产者，多消费者的无锁队列
+* poolChain 是表头元素，里面的head, tail分别指向链表的头和尾
+
+```go
+type poolChain struct {
+ // head 是推送到的 poolDequeue。这只被生产者访问，因此不需要同步。
+ head *poolChainElt
+
+ // tail 是 popTail 的 poolDequeue。这被消费者访问，因此读取和写入必须是原子的。
+ tail *poolChainElt
+}
+```
+
+* poolChainElt，大多数情况只有一个元素，极端情况会有两个节点, 每个poolDequeue超过限制，这时候才会新加一个节点
+
+```go
+type poolChainElt struct {
+ poolDequeue
+
+ // next 和 prev 链接到此 poolChain 中相邻的 poolChainElts。
+ // next 由生产者原子地写入，由消费者原子地读取。它只从 nil 过渡到非 nil。
+ // prev 由消费者原子地写入，由生产者原子地读取。它只从非 nil 过渡到 nil。
+ next, prev *poolChainElt
+}
+```
+
 ### 加注释代码
 
 ```go
