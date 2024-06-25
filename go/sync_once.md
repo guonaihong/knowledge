@@ -194,7 +194,7 @@ func main() {
 }
 ```
 
-#### 3.1 OnceValue用法
+#### 3.1 OnceValue实现
 
 OnceValue 和OnceFunc类似，只是带有返回值，这里可以看下go里面的泛型是如何声明的
 
