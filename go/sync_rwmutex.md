@@ -1,9 +1,9 @@
 ### 分析实现
 
-* RLock 主要是基于原子变量判断有没有写锁，如果有写锁就等待(readerSem)，没有写锁就是原子加readCount
-* RUnlock 主是是原子减readCount, 如果readWait为0， 就唤醒写锁(writerSem)
-* Lock readCount加上 -rwmutexMaxReaders, 如果readerWait 大于0， 就等待(writerSem) 被唤醒
-* Unlock readerCount加上 rwmutexMaxReaders, 如果有读者， 就唤醒(readerSem)
+* RLock: 主要是基于原子变量判断有没有写锁，如果有写锁就等待(readerSem)，没有写锁就是原子加readCount
+* RUnlock: 主是是原子减readCount, 如果readWait为0， 就唤醒写锁(writerSem)
+* Lock: readCount加上 -rwmutexMaxReaders, 如果readerWait 大于0， 就等待(writerSem) 被唤醒
+* Unlock: readerCount加上 rwmutexMaxReaders, 如果有读者， 就唤醒(readerSem)
 
 ### 源代码加注释
 
