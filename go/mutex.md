@@ -2,7 +2,7 @@
 
 ### Lock
 
-1. 先通过cash操作将state设置为mutexLocked
+1. 先通过cas操作将state设置为mutexLocked
 2. 如果不行，则进入慢速路径， 先自旋。
 3. 使用 runtime_SemacquireMutex(&m.sema, queueLifo, 1) 这个函数等待锁
 
