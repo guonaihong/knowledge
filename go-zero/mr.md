@@ -1,7 +1,7 @@
 ### 使用例子
 
 ```go
- err := Finish(func() error {
+ err := mr.Finish(func() error {
   atomic.AddUint32(&total, 2)
   return nil
  }, func() error {
@@ -20,6 +20,54 @@ mr的作用和errgroup很像，主要包含了两个功能
 * 把业务函数放至多个goroutine中执行，所有的函数执行完并返回
 * 并限并发数
 * mr默认是16个goroutine中执行
+
+### 核心实现分析
+
+```go
+func executeMappers[T, U any](mCtx mapperContext[T, U]) {
+ var wg sync.WaitGroup
+ defer func() {
+  wg.Wait()
+  close(mCtx.collector)
+  drain(mCtx.source)
+ }()
+
+ var failed int32
+ pool := make(chan struct{}, mCtx.workers)
+ writer := newGuardedWriter(mCtx.ctx, mCtx.collector, mCtx.doneChan)
+ for atomic.LoadInt32(&failed) == 0 {
+  select {
+  case <-mCtx.ctx.Done():
+   return
+  case <-mCtx.doneChan:
+   return
+   // 限制并发数
+  case pool <- struct{}{}:
+   item, ok := <-mCtx.source
+   if !ok {
+    <-pool
+    return
+   }
+
+   wg.Add(1)
+   // 把业务函数放到goroutine中执行
+   go func() {
+    defer func() {
+     if r := recover(); r != nil {
+      atomic.AddInt32(&failed, 1)
+      mCtx.panicChan.write(r)
+     }
+     wg.Done()
+     // 执行完业务函数后，释放令牌
+     <-pool
+    }()
+
+    mCtx.mapper(item, writer)
+   }()
+  }
+ }
+}
+```
 
 ### 源代码注释版本
 
