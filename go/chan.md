@@ -35,7 +35,7 @@ c <- true
 
 ```go
 
- c := make(chan bool, 3)
+ c := make(chan string, 4)
  c <- true
  c <- true
  c <- true
@@ -88,8 +88,9 @@ c <- true
 
 ```go
 
- c := make(chan bool, 4)
- c <- true
+ c := make(chan string, 2)
+ c <- "hello"
+ c <- "world"
 ```
 
 * 实现的代码
