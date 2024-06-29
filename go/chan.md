@@ -445,10 +445,16 @@ func chansend(c*hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 
  if c.qcount < c.dataqsiz {
   // 通道缓冲区中有空间。将元素入队发送。
+  // 获取sendx对应位置的指针
   qp := chanbuf(c, c.sendx)
   if raceenabled {
    racenotify(c, c.sendx, nil)
   }
+
+  // ep就是待写入元素的指针地址
+  // c <- ep
+  // typedmemmove约等于 c.buf[sendx] = ep
+  // 其中typedmemmove是字节拷贝
   typedmemmove(c.elemtype, qp, ep)
   c.sendx++
   if c.sendx == c.dataqsiz {
