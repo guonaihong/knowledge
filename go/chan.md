@@ -198,9 +198,18 @@ if c == nil {
 * 实现
 
 ```go
-c := make(chan bool, 4)
-c <- true
-<-c
+c := make(chan string, 2)
+go func() {
+  c <- "hello"
+  c <- "world"
+  c <- "block"
+}()
+
+time.Sleep(time.Second * 1)
+<- c // 读
+<- c // 读
+<- c // 读
+<- c // 读卡住
 ```
 
 * 实现
