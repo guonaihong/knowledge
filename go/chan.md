@@ -91,6 +91,7 @@ c <- true
  c := make(chan string, 2)
  c <- "hello"
  c <- "world"
+ c <- "block"
 ```
 
 * 实现的代码
