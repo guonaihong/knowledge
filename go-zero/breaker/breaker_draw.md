@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 requests = 1000
 accepts_list = [1000, 1000, 900, 900, 900, 800, 800, 800, 700, 600, 500, 400, 300, 200, 100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
 K_values = [0.1]
+# K_values = [0.1, 0.3, 0.5, 0.7, 1,1.1, 1.2, 1.3, 1.4, 1.5, 2, 3, 4]
 
 # Create a figure and axis
 plt.figure(figsize=(12, 8))

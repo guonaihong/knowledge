@@ -58,6 +58,7 @@ func newGoogleBreaker() *googleBreaker {
 func (b *googleBreaker) accept() error {
  var w float64
  history := b.history()
+ // 计算权重
  w = b.k - (b.k-minK)*float64(history.failingBuckets)/buckets
  weightedAccepts := mathx.AtLeast(w, minK) * float64(history.accepts)
  // 参考 <https://landing.google.com/sre/sre-book/chapters/handling-overload/#eq2101>
@@ -68,6 +69,7 @@ func (b *googleBreaker) accept() error {
  }
 
  lastPass := b.lastPass.Load()
+ // 当前时间超过强制通过的持续时间，强制通过
  if lastPass > 0 && timex.Since(lastPass) > forcePassDuration {
   b.lastPass.Set(timex.Now())
   return nil
