@@ -5,6 +5,11 @@ $$
 \max \left( 0, \frac{\text{requests} - K \times \text{accepts}}{\text{requests} + 1} \right)
 $$
 
+### k值的作用
+
+* k值越大，超宽松
+* k值越小，超严格
+
 ### python画图验证
 
 ```python
