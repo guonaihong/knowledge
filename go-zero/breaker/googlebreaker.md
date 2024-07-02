@@ -42,7 +42,7 @@ type (
 
 // 创建一个新的googleBreaker实例
 func newGoogleBreaker() *googleBreaker {
- bucketDuration := time.Duration(int64(window) / int64(buckets)) // 每个桶的持续时间
+ bucketDuration := time.Duration(int64(window) / int64(buckets)) // 每个桶的持续时间, 250ms
  st := collection.NewRollingWindow[int64, *bucket](func()*bucket {
   return new(bucket)
  }, buckets, bucketDuration)
