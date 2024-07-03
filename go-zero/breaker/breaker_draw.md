@@ -5,6 +5,23 @@ $$
 \max \left( 0, \frac{\text{requests} - K \times \text{accepts}}{\text{requests} + 1} \right)
 $$
 
+### 这个公式的本质
+
+这个公式其实是算错误率的，假如requests很大，就可以忽略分母的1，分子分母同时除以requests, 就得到下面的式子
+$$
+\max \left( 0, 1 - \frac{K \times \text{accepts}}{\text{requests}} \right)
+$$
+
+再细分，这就是成功率
+$$
+\frac{\text{accepts}}{\text{requests}}
+$$
+
+K乘以成功率，就是放大成功率的作用
+$$
+\frac{K \times \text{accepts}}{\text{requests}}
+$$
+
 ### k值的作用
 
 * k值越大，超宽松
