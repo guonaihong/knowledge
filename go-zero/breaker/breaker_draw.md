@@ -20,6 +20,7 @@ $$
 $$
 
 K乘以成功率，就是放大成功率的作用
+
 $$
 \frac{K \times \text{accepts}}{\text{requests}}
 $$
