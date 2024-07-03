@@ -1,4 +1,11 @@
 
+### 路由支持的tag
+
+* "path": url里面的变量
+* "form": 查询字符串，或者表单是查询字符串的
+* "header": http header
+* "json": body里面带json的
+
 ### 使用例子
 
 ```go
