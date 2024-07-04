@@ -1,4 +1,24 @@
 
+### 场景
+
+在日常开发中，经常遇到不好复现的问题。如果能拿到栈信息。
+这时候可以使用 `go tool pprof` 命令来分析问题。难题是如何保存现场。
+go-zero里面默认集成了，根据信号dump调用栈的代码
+
+* SIGUSR1: dump goroutines
+* SIGUSR2: dump profile, mem, mutex, block, trace, threadcreate
+
+```go
+ prof.startCpuProfile()
+ prof.startMemProfile()
+ prof.startMutexProfile()
+ prof.startBlockProfile()
+ prof.startTraceProfile()
+ prof.startThreadCreateProfile()
+```
+
+如果不用go-zero框架，也可以写个http server，根据接口来动态关启或者关闭profile, 或者结合监控系统，来打开或者关闭profile。
+
 ### 代码加上注释
 
 ```go
