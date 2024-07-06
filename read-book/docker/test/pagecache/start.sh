@@ -1,0 +1,1 @@
+docker run -it --rm go-file-signal
