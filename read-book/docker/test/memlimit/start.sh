@@ -1,0 +1,1 @@
+docker run -m 100m --memory-swap 100m go-memory-test
