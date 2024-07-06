@@ -2,7 +2,7 @@
 FROM alpine:latest
 
 # 创建一个无限循环的脚本
-RUN echo "while true; do sleep 10; done" > /infinite-loop.sh
+RUN echo -e "#!/bin/sh\nwhile true; do sleep 10; done" > /infinite-loop.sh
 
 # 赋予脚本执行权限
 RUN chmod +x /infinite-loop.sh
