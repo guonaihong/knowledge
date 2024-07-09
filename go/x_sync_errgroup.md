@@ -30,7 +30,7 @@ g := new(errgroup.Group)
 ### 解析
 
 * errgroup实现依赖了sync.WaitGroup，使用sync.Once的保证下，把第一个业务返回的err直接保存，然后在Wait函数里面返回
-* errgroup还提供了第二个功能，限制并发数，如果对一个有容易的chan进入写操作，满了之后可以卡住的特性。TryGo可以使用了select default 实现的
+* errgroup还提供了第二个功能，限制并发数，如果对一个有容量的chan进入写操作，满了之后可以卡住的特性。TryGo可以使用了select default 实现的
 
 ### 源代码
 
