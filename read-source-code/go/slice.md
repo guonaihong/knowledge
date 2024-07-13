@@ -241,9 +241,11 @@ func nextslicecap(newLen, oldCap int) int {
 
  const threshold = 256
  if oldCap < threshold {
+    // newlen = 2 * oldcap
   return doublecap
  }
  for {
+    // 随着newcap越来越大，相等于 newcap = 1.25 * newcap
   newcap += (newcap + 3*threshold) >> 2
   if uint(newcap) >= uint(newLen) {
    break
