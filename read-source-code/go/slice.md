@@ -1,4 +1,14 @@
 
+### 序
+
+```go
+var b []byte
+len(b)
+
+var i []int
+cap(i)
+```
+
 ### 一、slice 如何计算新的cap的长度
 
 * 如果新的len大于2倍的cap，直接用len当作cap的长度
