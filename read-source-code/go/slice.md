@@ -1,12 +1,35 @@
 
 ### 序
 
+#### 0.1 slice 的长度和容量的关系
+
 ```go
 var b []byte
 len(b)
 
 var i []int
 cap(i)
+```
+
+#### 0.2 扩容因子case 1
+
+```go
+var s []string
+s = append(s, "a", "b")
+```
+
+#### 02. 扩容因子case 2
+
+```go
+var s = make([]string, 2, 4)
+s = append(s, "a", "b", "b")
+```
+
+#### 03. 扩容因子case 3
+
+```go
+var s = make([]string, 257)
+s = append(s, "hello")
 ```
 
 ### 一、slice 如何计算新的cap的长度
@@ -20,14 +43,17 @@ func nextslicecap(newLen, oldCap int) int {
  newcap := oldCap
  doublecap := newcap + newcap
  if newLen > doublecap {
+    // case 1
   return newLen
  }
 
  const threshold = 256
  if oldCap < threshold {
+    // case 2
   return doublecap
  }
  for {
+    // case 3
   newcap += (newcap + 3*threshold) >> 2
   if uint(newcap) >= uint(newLen) {
    break
