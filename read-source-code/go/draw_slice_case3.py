@@ -24,7 +24,7 @@ newLens_case3 = list(range(256, 10000, 10))
 newCaps_case3 = [nextslicecap(newLen, newLen-1) for newLen in newLens_case3]
 
 # Plot the growth curves
-plt.figure(figsize=(10, 10))
+plt.figure(figsize=(8, 8))
 
 plt.subplot(1, 1, 1)
 plt.plot(newLens_case3, newCaps_case3, marker='o')
