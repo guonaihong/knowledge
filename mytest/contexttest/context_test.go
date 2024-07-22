@@ -15,11 +15,11 @@ func Test_Context(t *testing.T) {
 
 func Test_Context2(t *testing.T) {
 	ctx := context.TODO()
-	ctx2 := context.WithValue(ctx, "111", "1111")
-	ctx22 := context.WithValue(ctx, "22", "222")
-	_ = ctx22
-	ctx3 := context.WithValue(ctx2, "333", "3333")
+	ctx1 := context.WithValue(ctx, "1", "1")
+	ctx2 := context.WithValue(ctx1, "2", "2")
+	ctx3 := context.WithValue(ctx2, "3", "3")
 
-	fmt.Println(ctx3.Value("22"))
+	val := ctx3.Value("22")
+	fmt.Println(val)
 
 }
