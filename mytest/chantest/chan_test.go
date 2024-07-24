@@ -1,6 +1,9 @@
 package chantest
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func Test_Chan1(t *testing.T) {
 
@@ -40,5 +43,21 @@ func Test_Chan4(t *testing.T) {
 }
 
 func Test_Chan5(t *testing.T) {
+	c := make(chan bool, 5)
+	c <- true
+	close(c)
+	// for v := range c {
+	// 	fmt.Printf("%v\n", v)
+	// }
 
+exit:
+	for {
+		select {
+		case v, ok := <-c:
+			if !ok {
+				break exit
+			}
+			fmt.Printf("%v\n", v)
+		}
+	}
 }

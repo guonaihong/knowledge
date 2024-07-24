@@ -19,6 +19,10 @@ go-zero里面默认集成了，根据信号dump调用栈的代码
 
 如果不用go-zero框架，也可以写个http server，根据接口来动态关启或者关闭profile, 或者结合监控系统，来打开或者关闭profile。
 
+#### 解决过程如下
+1. 先dump 出问题点的profile，假如是内存, `kill -SIGUSR2`。
+2. 通过 `go tool pprof` 分析
+
 ### 代码加上注释
 
 ```go

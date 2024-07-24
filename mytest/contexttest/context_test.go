@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"unsafe"
 )
 
 func Test_Context(t *testing.T) {
@@ -20,6 +21,6 @@ func Test_Context2(t *testing.T) {
 	ctx3 := context.WithValue(ctx2, "3", "3")
 
 	val := ctx3.Value("22")
-	fmt.Println(val)
+	fmt.Println(val, unsafe.Sizeof(ctx3))
 
 }
