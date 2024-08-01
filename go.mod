@@ -7,4 +7,7 @@ require (
 	golang.org/x/time v0.5.0
 )
 
-require github.com/benbjohnson/clock v1.3.0 // indirect
+require (
+	github.com/benbjohnson/clock v1.3.0 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
+)
