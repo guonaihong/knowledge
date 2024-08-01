@@ -37,3 +37,8 @@ func TestErrors_As(t *testing.T) {
 	var target error
 	errors.As(err, &target)
 }
+
+func TestError_Join(t *testing.T) {
+	var err error
+	errors.Join(err, ErrNotFound)
+}
