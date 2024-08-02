@@ -412,4 +412,299 @@ func acquireSudog() *sudog {
     // 返回 sudog：
     return s
 }
+
+// findRunnable 函数用于在 Go 调度器中查找一个可运行的 Goroutine。
+// 返回值：gp 是找到的可运行 Goroutine，inheritTime 表示是否继承时间片，tryWakeP 表示是否尝试唤醒 P。
+func findRunnable() (gp *g, inheritTime, tryWakeP bool) {
+	mp := getg().m // 获取当前的 M（线程）
+
+	// 如果调度器正在等待 GC，则停止当前 M 并重新开始查找。
+top:
+	pp := mp.p.ptr() // 获取当前的 P（处理器）
+	if sched.gcwaiting.Load() {
+		gcstopm()
+		goto top
+	}
+	if pp.runSafePointFn != 0 {
+		runSafePointFn()
+	}
+
+	// 保存当前时间和轮询时间，以便后续的工作窃取操作。
+	now, pollUntil, _ := checkTimers(pp, 0)
+
+	// 尝试调度 trace reader。
+	if traceEnabled() || traceShuttingDown() {
+		gp := traceReader()
+		if gp != nil {
+			trace := traceAcquire()
+			casgstatus(gp, _Gwaiting, _Grunnable)
+			if trace.ok() {
+				trace.GoUnpark(gp, 0)
+				traceRelease(trace)
+			}
+			return gp, false, true
+		}
+	}
+
+	// 尝试调度一个 GC worker。
+	if gcBlackenEnabled != 0 {
+		gp, tnow := gcController.findRunnableGCWorker(pp, now)
+		if gp != nil {
+			return gp, false, true
+		}
+		now = tnow
+	}
+
+	// 偶尔检查全局可运行队列，以确保公平性。
+	if pp.schedtick%61 == 0 && sched.runqsize > 0 {
+		lock(&sched.lock)
+		gp := globrunqget(pp, 1)
+		unlock(&sched.lock)
+		if gp != nil {
+			return gp, false, false
+		}
+	}
+
+	// 唤醒 finalizer Goroutine。
+	if fingStatus.Load()&(fingWait|fingWake) == fingWait|fingWake {
+		if gp := wakefing(); gp != nil {
+			ready(gp, 0, true)
+		}
+	}
+	if *cgo_yield != nil {
+		asmcgocall(*cgo_yield, nil)
+	}
+
+	// 从本地运行队列获取 Goroutine。
+	if gp, inheritTime := runqget(pp); gp != nil {
+		return gp, inheritTime, false
+	}
+
+	// 从全局运行队列获取 Goroutine。
+	if sched.runqsize != 0 {
+		lock(&sched.lock)
+		gp := globrunqget(pp, 0)
+		unlock(&sched.lock)
+		if gp != nil {
+			return gp, false, false
+		}
+	}
+
+	// 轮询网络。
+	if netpollinited() && netpollAnyWaiters() && sched.lastpoll.Load() != 0 {
+		if list, delta := netpoll(0); !list.empty() { // 非阻塞
+			gp := list.pop()
+			injectglist(&list)
+			netpollAdjustWaiters(delta)
+			trace := traceAcquire()
+			casgstatus(gp, _Gwaiting, _Grunnable)
+			if trace.ok() {
+				trace.GoUnpark(gp, 0)
+				traceRelease(trace)
+			}
+			return gp, false, false
+		}
+	}
+
+	// 旋转的 M：从其他 P 窃取工作。
+	if mp.spinning || 2*sched.nmspinning.Load() < gomaxprocs-sched.npidle.Load() {
+		if !mp.spinning {
+			mp.becomeSpinning()
+		}
+
+		gp, inheritTime, tnow, w, newWork := stealWork(now)
+		if gp != nil {
+			// 成功窃取。
+			return gp, inheritTime, false
+		}
+		if newWork {
+			// 可能有新的定时器或 GC 工作；重新开始查找。
+			goto top
+		}
+
+		now = tnow
+		if w != 0 && (pollUntil == 0 || w < pollUntil) {
+			// 更早的定时器等待。
+			pollUntil = w
+		}
+	}
+
+	// 我们没有任何工作可做。
+	if gcBlackenEnabled != 0 && gcMarkWorkAvailable(pp) && gcController.addIdleMarkWorker() {
+		node := (*gcBgMarkWorkerNode)(gcBgMarkWorkerPool.pop())
+		if node != nil {
+			pp.gcMarkWorkerMode = gcMarkWorkerIdleMode
+			gp := node.gp.ptr()
+
+			trace := traceAcquire()
+			casgstatus(gp, _Gwaiting, _Grunnable)
+			if trace.ok() {
+				trace.GoUnpark(gp, 0)
+				traceRelease(trace)
+			}
+			return gp, false, false
+		}
+		gcController.removeIdleMarkWorker()
+	}
+
+	// wasm only:
+	// 如果一个回调返回且没有其他 Goroutine 被唤醒，则唤醒事件处理 Goroutine。
+	gp, otherReady := beforeIdle(now, pollUntil)
+	if gp != nil {
+		trace := traceAcquire()
+		casgstatus(gp, _Gwaiting, _Grunnable)
+		if trace.ok() {
+			trace.GoUnpark(gp, 0)
+			traceRelease(trace)
+		}
+		return gp, false, false
+	}
+	if otherReady {
+		goto top
+	}
+
+	// 在我们释放 P 之前，获取 allp 切片的快照。
+	allpSnapshot := allp
+	idlepMaskSnapshot := idlepMask
+	timerpMaskSnapshot := timerpMask
+
+	// 返回 P 并阻塞。
+	lock(&sched.lock)
+	if sched.gcwaiting.Load() || pp.runSafePointFn != 0 {
+		unlock(&sched.lock)
+		goto top
+	}
+	if sched.runqsize != 0 {
+		gp := globrunqget(pp, 0)
+		unlock(&sched.lock)
+		return gp, false, false
+	}
+	if !mp.spinning && sched.needspinning.Load() == 1 {
+		mp.becomeSpinning()
+		unlock(&sched.lock)
+		goto top
+	}
+	if releasep() != pp {
+		throw("findrunnable: wrong p")
+	}
+	now = pidleput(pp, now)
+	unlock(&sched.lock)
+
+	// 线程从旋转状态转换到非旋转状态，可能与提交新工作并发。
+	wasSpinning := mp.spinning
+	if mp.spinning {
+		mp.spinning = false
+		if sched.nmspinning.Add(-1) < 0 {
+			throw("findrunnable: negative nmspinning")
+		}
+
+		// 检查全局和 P 运行队列。
+		lock(&sched.lock)
+		if sched.runqsize != 0 {
+			pp, _ := pidlegetSpinning(0)
+			if pp != nil {
+				gp := globrunqget(pp, 0)
+				if gp == nil {
+					throw("global runq empty with non-zero runqsize")
+				}
+				unlock(&sched.lock)
+				acquirep(pp)
+				mp.becomeSpinning()
+				return gp, false, false
+			}
+		}
+		unlock(&sched.lock)
+
+		pp := checkRunqsNoP(allpSnapshot, idlepMaskSnapshot)
+		if pp != nil {
+			acquirep(pp)
+			mp.becomeSpinning()
+			goto top
+		}
+
+		// 再次检查 idle-priority GC 工作。
+		pp, gp := checkIdleGCNoP()
+		if pp != nil {
+			acquirep(pp)
+			mp.becomeSpinning()
+
+			// 运行 idle worker。
+			pp.gcMarkWorkerMode = gcMarkWorkerIdleMode
+			trace := traceAcquire()
+			casgstatus(gp, _Gwaiting, _Grunnable)
+			if trace.ok() {
+				trace.GoUnpark(gp, 0)
+				traceRelease(trace)
+			}
+			return gp, false, false
+		}
+
+		// 最后，检查定时器的创建或过期。
+		pollUntil = checkTimersNoP(allpSnapshot, timerpMaskSnapshot, pollUntil)
+	}
+
+	// 轮询网络直到下一个定时器。
+	if netpollinited() && (netpollAnyWaiters() || pollUntil != 0) && sched.lastpoll.Swap(0) != 0 {
+		sched.pollUntil.Store(pollUntil)
+		if mp.p != 0 {
+			throw("findrunnable: netpoll with p")
+		}
+		if mp.spinning {
+			throw("findrunnable: netpoll with spinning")
+		}
+		delay := int64(-1)
+		if pollUntil != 0 {
+			if now == 0 {
+				now = nanotime()
+			}
+			delay = pollUntil - now
+			if delay < 0 {
+				delay = 0
+			}
+		}
+		if faketime != 0 {
+			delay = 0
+		}
+		list, delta := netpoll(delay) // 阻塞直到有新工作可用
+		now = nanotime()
+		sched.pollUntil.Store(0)
+		sched.lastpoll.Store(now)
+		if faketime != 0 && list.empty() {
+			stopm()
+			goto top
+		}
+		lock(&sched.lock)
+		pp, _ := pidleget(now)
+		unlock(&sched.lock)
+		if pp == nil {
+			injectglist(&list)
+			netpollAdjustWaiters(delta)
+		} else {
+			acquirep(pp)
+			if !list.empty() {
+				gp := list.pop()
+				injectglist(&list)
+				netpollAdjustWaiters(delta)
+				trace := traceAcquire()
+				casgstatus(gp, _Gwaiting, _Grunnable)
+				if trace.ok() {
+					trace.GoUnpark(gp, 0)
+					traceRelease(trace)
+				}
+				return gp, false, false
+			}
+			if wasSpinning {
+				mp.becomeSpinning()
+			}
+			goto top
+		}
+	} else if pollUntil != 0 && netpollinited() {
+		pollerPollUntil := sched.pollUntil.Load()
+		if pollerPollUntil == 0 || pollerPollUntil > pollUntil {
+			netpollBreak()
+		}
+	}
+	stopm()
+	goto top
+}
 ```
