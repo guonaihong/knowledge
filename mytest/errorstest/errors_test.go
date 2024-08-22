@@ -224,3 +224,11 @@ func Benchmark_Errors_Wrap(b *testing.B) {
 	}
 
 }
+
+func Test_Error_append(t *testing.T) {
+	var errs []error
+	errs = append(errs, errors.New("err1"))
+	fmt.Printf("%d\n", cap(errs))
+	errs = append(errs, errors.New("err1"))
+	fmt.Printf("%d\n", cap(errs))
+}

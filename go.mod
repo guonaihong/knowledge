@@ -4,6 +4,7 @@ go 1.22.2
 
 require (
 	go.uber.org/ratelimit v0.3.1
+	golang.org/x/sync v0.8.0
 	golang.org/x/time v0.5.0
 )
 
