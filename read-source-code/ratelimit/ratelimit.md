@@ -79,7 +79,7 @@ func (t *mutexLimiter) Take() time.Time {
   t.last = now // 更新上次请求时间
  }
 
- return t.last // 返回上次请求的时间
+ return t.last // 返回更新后的上次请求时间
 }
 ```
 
